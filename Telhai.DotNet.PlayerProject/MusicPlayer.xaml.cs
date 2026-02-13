@@ -1,47 +1,65 @@
 ﻿using Microsoft.Win32;
+using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Net.Http;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Media3D;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Telhai.DotNet.PlayerProject.Models;
+using Telhai.DotNet.PlayerProject.Services;
+
 namespace Telhai.DotNet.PlayerProject
 {
-    /// <summary>
-    /// Interaction logic for MusicPlayer.xaml
-    /// </summary>
-
     public partial class MusicPlayer : Window
     {
-        private MediaPlayer mediaPlayer = new MediaPlayer();
-        private DispatcherTimer timer = new DispatcherTimer();
+        private readonly MediaPlayer mediaPlayer = new MediaPlayer();
+        private readonly DispatcherTimer timer = new DispatcherTimer();
         private List<MusicTrack> library = new List<MusicTrack>();
         private bool isDragging = false;
+
         private const string FILE_NAME = "library.json";
+
+        // STEP1: iTunes async + cancellation token
+        private readonly ItunesService _itunesService = new ItunesService();
+        private CancellationTokenSource? _cts;
+        private MusicTrack? _currentTrack;
+
+        // artwork download
+        private static readonly HttpClient _artHttp = new HttpClient();
 
         public MusicPlayer()
         {
-            //-- init all Hardcoded xaml into Elements type
             InitializeComponent();
-            timer.Interval = TimeSpan.FromMilliseconds(500);
-            timer.Tick += new EventHandler(Timer_Tick);
 
-            this.Loaded += MusicPlayer_Loaded;
-            // this.MouseDoubleClick += MusicPlayer_MouseDoubleClick; // this line is like the next line
-            // this.MouseDoubleClick += new MouseButtonEventHandler(MusicPlayer_MouseDoubleClick);
+            timer.Interval = TimeSpan.FromMilliseconds(500);
+            timer.Tick += Timer_Tick;
+
+            Loaded += MusicPlayer_Loaded;
         }
 
         private void MusicPlayer_Loaded(object sender, RoutedEventArgs e)
         {
             LoadLibrary();
+
+            // default UI
+            txtStatus.Text = "Ready";
+            txtCurrentSong.Text = "No Song Selected";
+            txtArtistName.Text = "";
+            txtMetaPath.Text = "";
+
+            SetDefaultArtwork();
         }
 
         private void Timer_Tick(object? sender, EventArgs e)
         {
-            // Update slider ONLY if music is loaded AND user is NOT holding the handle
             if (mediaPlayer.Source != null && mediaPlayer.NaturalDuration.HasTimeSpan && !isDragging)
             {
                 sliderProgress.Maximum = mediaPlayer.NaturalDuration.TimeSpan.TotalSeconds;
@@ -49,13 +67,16 @@ namespace Telhai.DotNet.PlayerProject
             }
         }
 
-        // --- EMPTY PLACEHOLDERS TO MAKE IT BUILD ---
-        private void BtnPlay_Click(object sender, RoutedEventArgs e)
+        // PLAY: if a song is selected -> play it (and fetch metadata)
+        private async void BtnPlay_Click(object sender, RoutedEventArgs e)
         {
-            //if(sender is Button btn)
-            //{
-            //    btn.Background =Brushes.LightGreen;
-            //}
+            if (lstLibrary.SelectedItem is MusicTrack track)
+            {
+                await StartPlayingAsync(track);
+                return;
+            }
+
+            // fallback: continue current playback
             mediaPlayer.Play();
             timer.Start();
             txtStatus.Text = "Playing";
@@ -82,71 +103,39 @@ namespace Telhai.DotNet.PlayerProject
 
         private void Slider_DragStarted(object sender, MouseButtonEventArgs e)
         {
-            isDragging = true; // Stop timer updates
+            isDragging = true;
         }
 
         private void Slider_DragCompleted(object sender, MouseButtonEventArgs e)
         {
-            isDragging = false; // Resume timer updates
+            isDragging = false;
             mediaPlayer.Position = TimeSpan.FromSeconds(sliderProgress.Value);
         }
 
         private void BtnAdd_Click(object sender, RoutedEventArgs e)
         {
-            // file dialog to choose file from system
-            OpenFileDialog ofd = new OpenFileDialog();
-            ofd.Multiselect = true; // we can add more than one file 
-            ofd.Filter = "MP3 Files|*.mp3";// to view only mp3 files 
+            OpenFileDialog ofd = new OpenFileDialog
+            {
+                Multiselect = true,
+                Filter = "MP3 Files|*.mp3"
+            };
 
-            // user confirmed 
             if (ofd.ShowDialog() == true)
             {
-                // iterate all files selected as string
                 foreach (string file in ofd.FileNames)
                 {
-                    // create object for each file 
-                    MusicTrack track = new MusicTrack
+                    var track = new MusicTrack
                     {
-                        // only file name 
-                        Title = System.IO.Path.GetFileNameWithoutExtension(file),
-                        // full path 
+                        Title = Path.GetFileNameWithoutExtension(file),
                         FilePath = file
                     };
                     library.Add(track);
                 }
+
                 UpdateLibraryUI();
                 SaveLibrary();
             }
         }
-
-
-        private void UpdateLibraryUI()
-        {
-            // take all library list as source to the listbox
-            // display tostring for inner object within list
-            lstLibrary.ItemsSource = null;
-            lstLibrary.ItemsSource = library;
-        }
-        private void SaveLibrary()
-        {
-            var options = new JsonSerializerOptions { WriteIndented = true };
-            string json = JsonSerializer.Serialize(library);
-            File.WriteAllText(FILE_NAME, json);
-        }
-        private void LoadLibrary()
-        {
-            if (File.Exists(FILE_NAME))
-            {
-                //read file 
-                string json = File.ReadAllText(FILE_NAME);
-                // create list of MusicTrack from json
-                library = JsonSerializer.Deserialize<List<MusicTrack>>(json) ?? new List<MusicTrack>();
-                // show all loaded MusicTrack 
-                UpdateLibraryUI();
-            }
-        }
-
-
 
         private void BtnRemove_Click(object sender, RoutedEventArgs e)
         {
@@ -158,51 +147,176 @@ namespace Telhai.DotNet.PlayerProject
             }
         }
 
-        private void LstLibrary_MouseDoubleClick(object sender, MouseButtonEventArgs e)
-        {
-            if (lstLibrary.SelectedItem is MusicTrack track)
-            {
-                mediaPlayer.Open(new Uri(track.FilePath));
-                mediaPlayer.Play();
-                timer.Start();
-                txtCurrentSong.Text = track.Title;
-                txtStatus.Text = "Playing";
-            }
-        }
-
         private void BtnSettings_Click(object sender, RoutedEventArgs e)
         {
-            // create settings widow instance 
             Settings settingsWin = new Settings();
-            // subscribe onscancompleted event
             settingsWin.OnScanCompleted += SettingsWin_OnScanCompleted;
-
             settingsWin.ShowDialog();
-
         }
 
-        private void SettingsWin_OnScanCompleted(List<MusicTrack> newTracksEventDataList)
+        private void SettingsWin_OnScanCompleted(List<MusicTrack> newTracks)
         {
-            foreach (var track in newTracksEventDataList)
+            foreach (var t in newTracks)
             {
-                // Prevent duplicates based on FilePath
-                if (!library.Any(x => x.FilePath == track.FilePath))
-                {
-                    library.Add(track);
-                }
+                if (!library.Any(x => x.FilePath == t.FilePath))
+                    library.Add(t);
             }
 
             UpdateLibraryUI();
             SaveLibrary();
-
         }
 
+        private void UpdateLibraryUI()
+        {
+            lstLibrary.ItemsSource = null;
+            lstLibrary.ItemsSource = library;
+        }
 
-        //private void MusicPlayer_MouseDoubleClick(object sender, MouseButtonEventArgs e)
-        //{
-        //    MainWindow p = new MainWindow();
-        //    p.Title = "YYYY";
-        //    p.Show();
-        //}
+        private void SaveLibrary()
+        {
+            string json = JsonSerializer.Serialize(library);
+            File.WriteAllText(FILE_NAME, json);
+        }
+
+        private void LoadLibrary()
+        {
+            if (File.Exists(FILE_NAME))
+            {
+                string json = File.ReadAllText(FILE_NAME);
+                library = JsonSerializer.Deserialize<List<MusicTrack>>(json) ?? new List<MusicTrack>();
+                UpdateLibraryUI();
+            }
+        }
+
+        // Single click: show local title + local path (no play)
+        private void LstLibrary_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (lstLibrary.SelectedItem is MusicTrack track)
+            {
+                txtStatus.Text = "Ready";
+                txtCurrentSong.Text = track.Title;
+                txtArtistName.Text = "";
+                txtMetaPath.Text = track.FilePath;
+                SetDefaultArtwork();
+            }
+        }
+
+        // Double click: play + async metadata
+        private async void LstLibrary_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (lstLibrary.SelectedItem is MusicTrack track)
+            {
+                await StartPlayingAsync(track);
+            }
+        }
+
+        // =============================
+        // STEP1: Play + iTunes async
+        // =============================
+
+        private async Task StartPlayingAsync(MusicTrack track)
+        {
+            _currentTrack = track;
+
+            // local UI immediately
+            txtStatus.Text = "Playing";
+            txtCurrentSong.Text = track.Title;
+            txtArtistName.Text = "";
+            txtMetaPath.Text = track.FilePath;
+            SetDefaultArtwork();
+
+            // play immediately
+            mediaPlayer.Open(new Uri(track.FilePath));
+            mediaPlayer.Play();
+            timer.Start();
+
+            // cancel previous call
+            _cts?.Cancel();
+            _cts?.Dispose();
+            _cts = new CancellationTokenSource();
+            CancellationToken token = _cts.Token;
+
+            // build query from filename (spaces/hyphen)
+            string query = BuildSearchTermFromFileName(track.Title);
+
+            try
+            {
+                // Your service should return ItunesTrackInfo (TrackName/ArtistName/AlbumName/ArtworkUrl)
+                ItunesTrackInfo? info = await _itunesService.SearchOneAsync(query, token);
+
+                // if user changed track - do nothing
+                if (token.IsCancellationRequested || _currentTrack?.FilePath != track.FilePath)
+                    return;
+
+                if (info == null)
+                {
+                    // no API result -> show local only
+                    txtCurrentSong.Text = track.Title;
+                    txtArtistName.Text = "";
+                    txtMetaPath.Text = track.FilePath;
+                    SetDefaultArtwork();
+                    return;
+                }
+
+                // update UI from API
+                txtCurrentSong.Text = string.IsNullOrWhiteSpace(info.TrackName) ? track.Title : info.TrackName!;
+                txtArtistName.Text = info.ArtistName ?? "";
+
+                // album name is optional; if you want to display it later, add another TextBlock.
+                // for now you asked only: artist under song name, path bottom-left.
+
+                if (!string.IsNullOrWhiteSpace(info.ArtworkUrl))
+                    await SetArtworkFromUrlAsync(info.ArtworkUrl, token);
+                else
+                    SetDefaultArtwork();
+            }
+            catch
+            {
+                // requirement on error: show file name (no extension) + full path
+                txtCurrentSong.Text = track.Title;
+                txtArtistName.Text = "";
+                txtMetaPath.Text = track.FilePath;
+                SetDefaultArtwork();
+            }
+        }
+
+        private static string BuildSearchTermFromFileName(string titleFromFile)
+        {
+            string s = titleFromFile.Replace("-", " ").Replace("_", " ");
+            while (s.Contains("  "))
+                s = s.Replace("  ", " ");
+            return s.Trim();
+        }
+
+        private void SetDefaultArtwork()
+        {
+            try
+            {
+                imgArtwork.Source = new BitmapImage(
+                    new Uri("pack://application:,,,/Assets/default_cover.png", UriKind.Absolute));
+            }
+            catch (Exception ex)
+            {
+                // זמני לבדיקה:
+                MessageBox.Show(ex.Message, "Default image load failed");
+                imgArtwork.Source = null;
+            }
+        }
+
+        private async Task SetArtworkFromUrlAsync(string url, CancellationToken token)
+        {
+            byte[] bytes = await _artHttp.GetByteArrayAsync(url, token);
+            token.ThrowIfCancellationRequested();
+
+            using var ms = new MemoryStream(bytes);
+            var bmp = new BitmapImage();
+            bmp.BeginInit();
+            bmp.CacheOption = BitmapCacheOption.OnLoad;
+            bmp.StreamSource = ms;
+            bmp.EndInit();
+            bmp.Freeze();
+
+            imgArtwork.Source = bmp;
+        }
     }
 }
