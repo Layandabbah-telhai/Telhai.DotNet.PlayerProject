@@ -16,6 +16,7 @@ using System.Windows.Threading;
 using Telhai.DotNet.PlayerProject.Models;
 using Telhai.DotNet.PlayerProject.Services;
 
+
 namespace Telhai.DotNet.PlayerProject
 {
     public partial class MusicPlayer : Window
@@ -27,14 +28,14 @@ namespace Telhai.DotNet.PlayerProject
         private List<MusicTrack> library = new List<MusicTrack>();
         private const string FILE_NAME = "library.json";
 
-        // STEP1 service
+        // iTunes
         private readonly ItunesService _itunesService = new ItunesService();
         private CancellationTokenSource? _cts;
         private MusicTrack? _currentTrack;
 
-        // STEP3 cache store + metadata service
+        // Step3 JSON cache
         private readonly TrackDataStore _trackStore = new TrackDataStore();
-        private MetadataService _metadataService;
+        private readonly MetadataService _metadataService;
 
         // artwork download
         private static readonly HttpClient _artHttp = new HttpClient();
@@ -70,6 +71,9 @@ namespace Telhai.DotNet.PlayerProject
             txtAlbumName.Text = "";
             txtMetaPath.Text = "";
 
+            // Bind ItemsSource ONCE (important for selection stability)
+            lstLibrary.ItemsSource = library;
+
             SetDefaultArtwork();
         }
 
@@ -89,8 +93,7 @@ namespace Telhai.DotNet.PlayerProject
 
         private async Task RotateImageAsync()
         {
-            if (_currentImageList.Count == 0)
-                return;
+            if (_currentImageList.Count == 0) return;
 
             _imgIndex = (_imgIndex + 1) % _currentImageList.Count;
             string src = _currentImageList[_imgIndex];
@@ -103,20 +106,17 @@ namespace Telhai.DotNet.PlayerProject
                 }
                 else
                 {
-                    // local image path
                     imgArtwork.Source = LoadLocalImage(src);
                 }
             }
             catch
             {
-                // If something fails mid-loop, don't crash
                 SetDefaultArtwork();
             }
         }
 
         private static BitmapImage LoadLocalImage(string filePath)
         {
-            // Load without locking the file
             using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             var bmp = new BitmapImage();
             bmp.BeginInit();
@@ -127,7 +127,7 @@ namespace Telhai.DotNet.PlayerProject
             return bmp;
         }
 
-        // PLAY: if selected -> play that track (and show cached or fetch once)
+        // ✅ PLAY: plays selected song (must work after single click)
         private async void BtnPlay_Click(object sender, RoutedEventArgs e)
         {
             if (lstLibrary.SelectedItem is MusicTrack track)
@@ -136,6 +136,7 @@ namespace Telhai.DotNet.PlayerProject
                 return;
             }
 
+            // If nothing is selected, continue current playback if any
             mediaPlayer.Play();
             timer.Start();
             txtStatus.Text = "Playing";
@@ -193,12 +194,11 @@ namespace Telhai.DotNet.PlayerProject
                     };
                     library.Add(track);
 
-                    // create cache entry (title + path) - no API call
+                    // Create cache entry (no API call)
                     _trackStore.GetOrCreate(track.FilePath, track.Title);
                 }
 
                 _trackStore.Save();
-
                 UpdateLibraryUI();
                 SaveLibrary();
             }
@@ -228,12 +228,11 @@ namespace Telhai.DotNet.PlayerProject
                 if (!library.Any(x => x.FilePath == t.FilePath))
                 {
                     library.Add(t);
-                    _trackStore.GetOrCreate(t.FilePath, t.Title); // no API here
+                    _trackStore.GetOrCreate(t.FilePath, t.Title);
                 }
             }
 
             _trackStore.Save();
-
             UpdateLibraryUI();
             SaveLibrary();
         }
@@ -245,22 +244,18 @@ namespace Telhai.DotNet.PlayerProject
 
             var td = _trackStore.GetOrCreate(track.FilePath, track.Title);
 
-            var win = new EditTrackWindow(td, _trackStore)
-            {
-                Owner = this
-            };
-
+            var win = new EditTrackWindow(td, _trackStore) { Owner = this };
             bool? ok = win.ShowDialog();
+
             if (ok == true)
             {
-                // Refresh list title if user edited it
                 var updated = _trackStore.Get(track.FilePath);
                 if (updated != null)
                 {
                     track.Title = updated.Title;
                     UpdateLibraryUI();
 
-                    // refresh current display
+                    // refresh display
                     txtCurrentSong.Text = updated.Title;
                     txtArtistName.Text = updated.Artist ?? "";
                     txtAlbumName.Text = updated.Album ?? "";
@@ -269,14 +264,24 @@ namespace Telhai.DotNet.PlayerProject
                     _ = DisplayArtworkFromTrackDataAsync(updated);
                 }
 
-                SaveLibrary(); // keep library.json with updated Titles (optional but useful)
+                SaveLibrary();
             }
         }
 
+        // ✅ FIX: refresh without clearing selection
         private void UpdateLibraryUI()
         {
-            lstLibrary.ItemsSource = null;
-            lstLibrary.ItemsSource = library;
+            string? selectedPath = (lstLibrary.SelectedItem as MusicTrack)?.FilePath;
+
+            // ItemsSource already bound once, just refresh
+            lstLibrary.Items.Refresh();
+
+            if (!string.IsNullOrWhiteSpace(selectedPath))
+            {
+                var again = library.FirstOrDefault(t => t.FilePath == selectedPath);
+                if (again != null)
+                    lstLibrary.SelectedItem = again;
+            }
         }
 
         private void SaveLibrary()
@@ -291,11 +296,10 @@ namespace Telhai.DotNet.PlayerProject
             {
                 string json = File.ReadAllText(FILE_NAME);
                 library = JsonSerializer.Deserialize<List<MusicTrack>>(json) ?? new List<MusicTrack>();
-                UpdateLibraryUI();
             }
         }
 
-        // Single click: show saved JSON metadata if exists (NO API CALL)
+        // ✅ Single click: show from JSON cache ONLY (no API)
         private async void LstLibrary_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (lstLibrary.SelectedItem is not MusicTrack track)
@@ -304,12 +308,11 @@ namespace Telhai.DotNet.PlayerProject
             txtStatus.Text = "Ready";
             txtMetaPath.Text = track.FilePath;
 
-            StopSlideshow(); // only loop images while playing
+            StopSlideshow();
 
             var td = _trackStore.Get(track.FilePath);
             if (td == null)
             {
-                // local only
                 txtCurrentSong.Text = track.Title;
                 txtArtistName.Text = "";
                 txtAlbumName.Text = "";
@@ -317,14 +320,12 @@ namespace Telhai.DotNet.PlayerProject
                 return;
             }
 
-            // show from JSON
             txtCurrentSong.Text = string.IsNullOrWhiteSpace(td.Title) ? track.Title : td.Title;
             txtArtistName.Text = td.Artist ?? "";
             txtAlbumName.Text = td.Album ?? "";
             await DisplayArtworkFromTrackDataAsync(td);
         }
 
-        // Double click: play + cached metadata (or fetch once and cache)
         private async void LstLibrary_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
             if (lstLibrary.SelectedItem is MusicTrack track)
@@ -340,35 +341,29 @@ namespace Telhai.DotNet.PlayerProject
             txtStatus.Text = "Playing";
             txtMetaPath.Text = track.FilePath;
 
-            // Start audio immediately
             mediaPlayer.Open(new Uri(track.FilePath));
             mediaPlayer.Play();
             timer.Start();
 
-            // Cancel previous metadata fetch
             _cts?.Cancel();
             _cts?.Dispose();
             _cts = new CancellationTokenSource();
             var token = _cts.Token;
 
-            // show at least local title immediately
             txtCurrentSong.Text = track.Title;
             txtArtistName.Text = "";
             txtAlbumName.Text = "";
             SetDefaultArtwork();
 
-            // Build query from filename
             string query = BuildSearchTermFromFileName(track.Title);
 
             try
             {
-                // Cache-first (API only if missing)
                 TrackData td = await _metadataService.GetTrackDataAsync(track, query, token);
 
                 if (token.IsCancellationRequested || _currentTrack?.FilePath != track.FilePath)
                     return;
 
-                // Apply saved title edits back to library item
                 if (!string.IsNullOrWhiteSpace(td.Title) && td.Title != track.Title)
                 {
                     track.Title = td.Title;
@@ -381,13 +376,10 @@ namespace Telhai.DotNet.PlayerProject
                 txtAlbumName.Text = td.Album ?? "";
 
                 await DisplayArtworkFromTrackDataAsync(td);
-
-                // Start slideshow while playing
                 StartSlideshowFromTrackData(td);
             }
             catch
             {
-                // On error show local only (as required)
                 txtCurrentSong.Text = track.Title;
                 txtArtistName.Text = "";
                 txtAlbumName.Text = "";
@@ -402,14 +394,12 @@ namespace Telhai.DotNet.PlayerProject
             _currentImageList.Clear();
             _imgIndex = -1;
 
-            // If user images exist -> loop them
             if (td.Images != null && td.Images.Count > 0)
             {
                 _currentImageList.AddRange(td.Images.Where(File.Exists));
             }
             else if (!string.IsNullOrWhiteSpace(td.ArtworkUrl))
             {
-                // otherwise use saved artwork url
                 _currentImageList.Add(td.ArtworkUrl);
             }
 
@@ -421,7 +411,7 @@ namespace Telhai.DotNet.PlayerProject
             }
 
             _artTimer.Start();
-            _ = RotateImageAsync(); // show immediately
+            _ = RotateImageAsync();
         }
 
         private void StopSlideshow()
@@ -433,7 +423,6 @@ namespace Telhai.DotNet.PlayerProject
 
         private async Task DisplayArtworkFromTrackDataAsync(TrackData td)
         {
-            // If user images exist -> show first image (no loop unless playing)
             if (td.Images != null && td.Images.Count > 0)
             {
                 var firstExisting = td.Images.FirstOrDefault(File.Exists);
@@ -444,7 +433,6 @@ namespace Telhai.DotNet.PlayerProject
                 }
             }
 
-            // else show cached ArtworkUrl (no API call)
             if (!string.IsNullOrWhiteSpace(td.ArtworkUrl))
             {
                 try
@@ -452,10 +440,7 @@ namespace Telhai.DotNet.PlayerProject
                     await SetArtworkFromUrlAsync(td.ArtworkUrl, CancellationToken.None);
                     return;
                 }
-                catch
-                {
-                    // ignore, fall back
-                }
+                catch { }
             }
 
             SetDefaultArtwork();

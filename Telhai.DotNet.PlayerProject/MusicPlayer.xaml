@@ -72,6 +72,7 @@
 
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                     <Button Content="STOP" Click="BtnStop_Click" Width="80" Height="40" Margin="5"/>
+                    <!-- IMPORTANT: Click MUST be BtnPlay_Click -->
                     <Button Content="PLAY" Click="BtnPlay_Click" Width="100" Height="40" Margin="5"
                             FontWeight="Bold" Background="#007ACC" Foreground="White"/>
                     <Button Content="PAUSE" Click="BtnPause_Click" Width="80" Height="40" Margin="5"/>
