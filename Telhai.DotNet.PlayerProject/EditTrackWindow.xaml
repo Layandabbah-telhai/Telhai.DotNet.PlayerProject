@@ -1,0 +1,52 @@
+﻿<Window x:Class="Telhai.DotNet.PlayerProject.EditTrackWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Telhai.DotNet.PlayerProject"
+        mc:Ignorable="d"
+        Title="EditTrackWindow" Height="450" Width="800">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Top -->
+        <StackPanel>
+            <TextBlock Text="File Path:" FontWeight="Bold"/>
+            <TextBlock Text="{Binding FilePath}" TextWrapping="Wrap" Margin="0,0,0,10"/>
+
+            <TextBlock Text="Title:" FontWeight="Bold"/>
+            <TextBox Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,10"/>
+
+            <TextBlock Text="Saved Metadata (no API calls here):" FontWeight="Bold"/>
+            <TextBlock Text="{Binding Artist}" />
+            <TextBlock Text="{Binding Album}" Margin="0,0,0,10"/>
+        </StackPanel>
+
+        <!-- Images -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <ListBox ItemsSource="{Binding Images}"
+                     SelectedItem="{Binding SelectedImage}"
+                     Grid.Column="0"/>
+
+            <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Top">
+                <Button Content="Add Image" Command="{Binding AddImageCommand}" Margin="0,0,0,6" Width="120"/>
+                <Button Content="Remove" Command="{Binding RemoveSelectedImageCommand}" Width="120"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Save" Command="{Binding SaveCommand}" Width="90" Margin="6"/>
+            <Button Content="Cancel" Command="{Binding CancelCommand}" Width="90" Margin="6"/>
+        </StackPanel>
+    </Grid>
+</Window>
