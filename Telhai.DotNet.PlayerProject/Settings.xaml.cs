@@ -12,9 +12,10 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using Telhai.DotNet.PlayerProject.Models;
+using Telhai.LayanDabbah.DotNet.PlayerProject;
+using Telhai.LayanDabbah.DotNet.PlayerProject.Models;
 
-namespace Telhai.DotNet.PlayerProject
+namespace Telhai.LayanDabbah.DotNet.PlayerProject
 {
     /// <summary>
     /// Interaction logic for Settings.xaml

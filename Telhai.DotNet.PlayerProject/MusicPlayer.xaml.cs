@@ -1,4 +1,13 @@
-﻿using Microsoft.Win32;
+﻿/* Plan (pseudocode):
+ - Open existing MusicPlayer.xaml.cs source and update only the namespace declaration.
+ - Keep all using directives and class implementation unchanged.
+ - Insert this small plan as a top-of-file comment for traceability.
+ - Ensure the new namespace is exactly: TelHai.LayanDabbah.PlayerProject
+ - Preserve file path and partial class name so XAML linkage remains valid.
+ - Do not modify other identifiers, usings, or behavior.
+*/
+
+using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -13,11 +22,11 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
-using Telhai.DotNet.PlayerProject.Models;
-using Telhai.DotNet.PlayerProject.Services;
+using Telhai.LayanDabbah.DotNet.PlayerProject.Models;
+using Telhai.LayanDabbah.DotNet.PlayerProject.Services;
 
 
-namespace Telhai.DotNet.PlayerProject
+namespace Telhai.LayanDabbah.DotNet.PlayerProject
 {
     public partial class MusicPlayer : Window
     {

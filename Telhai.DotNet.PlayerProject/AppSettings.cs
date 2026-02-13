@@ -8,7 +8,7 @@ using System.IO;
 using System.Text.Json;
 
 
-namespace Telhai.DotNet.PlayerProject
+namespace Telhai.LayanDabbah.DotNet.PlayerProject
 {
     public class AppSettings
     {

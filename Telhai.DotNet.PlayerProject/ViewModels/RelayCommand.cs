@@ -7,7 +7,7 @@ using System.Windows.Input;
 
 
 
-namespace Telhai.DotNet.PlayerProject.ViewModels
+namespace Telhai.LayanDabbah.DotNet.PlayerProject.ViewModels
 {
     public class RelayCommand : ICommand
     {

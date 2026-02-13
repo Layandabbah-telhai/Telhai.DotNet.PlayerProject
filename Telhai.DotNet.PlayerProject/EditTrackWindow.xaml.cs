@@ -11,12 +11,12 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
-using Telhai.DotNet.PlayerProject.Models;
-using Telhai.DotNet.PlayerProject.Services;
-using Telhai.DotNet.PlayerProject.ViewModels;
+using Telhai.LayanDabbah.DotNet.PlayerProject.ViewModels;
+using Telhai.LayanDabbah.DotNet.PlayerProject.Models;
+using Telhai.LayanDabbah.DotNet.PlayerProject.Services;
 
 
-namespace Telhai.DotNet.PlayerProject
+namespace Telhai.LayanDabbah.DotNet.PlayerProject
 {
     public partial class EditTrackWindow : Window
     {

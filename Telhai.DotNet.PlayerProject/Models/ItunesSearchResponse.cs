@@ -5,7 +5,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
-namespace Telhai.DotNet.PlayerProject.Models
+namespace Telhai.LayanDabbah.DotNet.PlayerProject.Models
 {
     public class ItunesSearchResponse
     {

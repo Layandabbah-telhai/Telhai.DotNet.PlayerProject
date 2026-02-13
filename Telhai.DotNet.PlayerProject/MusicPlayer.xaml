@@ -1,4 +1,4 @@
-﻿<Window x:Class="Telhai.DotNet.PlayerProject.MusicPlayer"
+﻿<Window x:Class="Telhai.LayanDabbah.DotNet.PlayerProject.MusicPlayer"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Classroom Music Player"

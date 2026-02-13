@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Telhai.DotNet.PlayerProject.Models;
+using Telhai.LayanDabbah.DotNet.PlayerProject.Models;
 
-namespace Telhai.DotNet.PlayerProject.Services
+namespace Telhai.LayanDabbah.DotNet.PlayerProject.Services
 {
     public class MetadataService
     {

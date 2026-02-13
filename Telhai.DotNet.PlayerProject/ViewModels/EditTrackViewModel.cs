@@ -7,11 +7,10 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
-using Telhai.DotNet.PlayerProject.Models;
-using Telhai.DotNet.PlayerProject.Services;
+using Telhai.LayanDabbah.DotNet.PlayerProject.Models;
+using Telhai.LayanDabbah.DotNet.PlayerProject.Services;
 
-
-namespace Telhai.DotNet.PlayerProject.ViewModels
+namespace Telhai.LayanDabbah.DotNet.PlayerProject.ViewModels
 {
     public class EditTrackViewModel : INotifyPropertyChanged
     {
